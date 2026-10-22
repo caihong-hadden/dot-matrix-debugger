@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8x8 点阵屏代码与坐标调试工具</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            
+            --led-color: #38bdf8;
+            --led-glow: rgba(56, 189, 248, 0.6);
+            --led-off: #1e293b;
+            --led-off-border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 270px 1fr;
+            flex: 1;
+            max-width: 1500px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1.25rem;
+            gap: 1.25rem;
+        }
+
+        @media (max-width: 960px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .color-presets {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
+
+        .color-btn {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .color-btn:hover {
+            transform: scale(1.08);
+        }
+
+        .color-btn.active {
+            border-color: #ffffff;
+            box-shadow: 0 0 12px currentColor;
+        }
+
+        .custom-color-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+            background: var(--bg-primary);
+            padding: 0.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .custom-color-wrapper input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            background: none;
+        }
+
+        .custom-color-wrapper input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 6px;
+        }
+
+        .hex-val {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background-color: #334155;
+            border-color: #475569;
+        }
+
+        .btn-danger {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            background-color: rgba(239, 68, 68, 0.2);
+            border-color: #ef4444;
+        }
+
+        .btn-primary {
+            background-color: #2563eb;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+        }
+
+        .btn-success {
+            background-color: #059669;
+            color: white;
+            border-color: #10b981;
+        }
+
+        .btn-success:hover {
+            background-color: #047857;
+        }
+
+        /* Workspace Area */
+        .workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .matrix-container-wrapper {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Axis Header styling */
+        .grid-with-axis {
+            display: grid;
+            grid-template-columns: 28px auto;
+            grid-template-rows: 28px auto;
+            gap: 6px;
+        }
+
+        .corner-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            color: #38bdf8;
+            font-weight: bold;
+        }
+
+        .col-axis {
+            display: grid;
+            grid-template-columns: repeat(8, 42px);
+            gap: 8px;
+            align-items: center;
+            justify-items: center;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .row-axis {
+            display: grid;
+            grid-template-rows: repeat(8, 42px);
+            gap: 8px;
+            align-items: center;
+            justify-items: center;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+            background: #090d16;
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 10px 25px -5px rgba(0,0,0,0.5);
+            border: 1px solid #1e293b;
+        }
+
+        .led-dot {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background-color: var(--led-off);
+            border: 1px solid var(--led-off-border);
+            cursor: pointer;
+            transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.65rem;
+            color: rgba(255,255,255,0.2);
+        }
+
+        .led-dot:hover {
+            transform: scale(1.08);
+            border-color: #64748b;
+        }
+
+        .led-dot.active {
+            background-color: var(--color-active);
+            box-shadow: 0 0 12px var(--color-glow), inset 0 0 6px rgba(255,255,255,0.6);
+            border-color: rgba(255,255,255,0.8);
+            color: rgba(0, 0, 0, 0.7);
+            font-weight: bold;
+        }
+
+        /* Dual Output Section */
+        .outputs-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+
+        @media (max-width: 900px) {
+            .outputs-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .output-panel {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .code-box {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.82rem;
+            color: #38bdf8;
+            height: 310px;
+            overflow-y: auto;
+            white-space: pre;
+            line-height: 1.5;
+        }
+
+        .code-box.c-code {
+            color: #a7f3d0;
+        }
+
+        .code-box::-webkit-scrollbar {
+            width: 8px;
+        }
+        .code-box::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        .code-box::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        .stats-bar span strong {
+            color: var(--text-main);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>⚡ 8x8 点阵屏代码与坐标调试工具</h1>
+            <div class="subtitle">支持 51单片机 查表法 ROM 常量数组 (X_Tab/Y_Tab) & switch-case 代码生成</div>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <!-- Sidebar Controls -->
+        <div class="sidebar">
+            <div>
+                <div class="section-title">LED 颜色调节</div>
+                <div class="color-presets">
+                    <button class="color-btn active" style="background-color: #38bdf8; --glow: rgba(56,189,248,0.7)" data-color="#38bdf8" title="天蓝"></button>
+                    <button class="color-btn" style="background-color: #ef4444; --glow: rgba(239,68,68,0.7)" data-color="#ef4444" title="红色"></button>
+                    <button class="color-btn" style="background-color: #22c55e; --glow: rgba(34,197,94,0.7)" data-color="#22c55e" title="绿色"></button>
+                    <button class="color-btn" style="background-color: #eab308; --glow: rgba(234,179,8,0.7)" data-color="#eab308" title="黄色"></button>
+                    <button class="color-btn" style="background-color: #a855f7; --glow: rgba(168,85,247,0.7)" data-color="#a855f7" title="紫色"></button>
+                    <button class="color-btn" style="background-color: #f97316; --glow: rgba(249,115,22,0.7)" data-color="#f97316" title="橙色"></button>
+                    <button class="color-btn" style="background-color: #ec4899; --glow: rgba(236,72,153,0.7)" data-color="#ec4899" title="粉红"></button>
+                    <button class="color-btn" style="background-color: #ffffff; --glow: rgba(255,255,255,0.7)" data-color="#ffffff" title="纯白"></button>
+                </div>
+                <div class="custom-color-wrapper">
+                    <input type="color" id="customColorPicker" value="#38bdf8">
+                    <span>自定义:</span>
+                    <span class="hex-val" id="hexVal">#38bdf8</span>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">点阵控制</div>
+                <div class="btn-group">
+                    <button class="btn btn-danger" id="btnClear">
+                        🗑️ 清空点阵屏
+                    </button>
+                    <button class="btn" id="btnFill">
+                        💡 点亮全部 LED
+                    </button>
+                    <button class="btn" id="btnInvert">
+                        🔄 反转亮灭
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">代码参数设置</div>
+                <div class="btn-group">
+                    <label style="font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span>生成代码模式:</span>
+                        <select id="codeModeSelect" style="background: var(--bg-primary); color: white; border: 1px solid var(--border-color); padding: 4px 6px; border-radius: 4px; font-size: 0.8rem;">
+                            <option value="table">查表法 (X_Tab/Y_Tab 推荐)</option>
+                            <option value="switch">Switch-Case 分支模式</option>
+                        </select>
+                    </label>
+
+                    <label style="font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                        <span>51 code 关键字:</span>
+                        <input type="checkbox" id="use51CodeKey" checked style="cursor: pointer;">
+                    </label>
+
+                    <label style="font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                        <span>函数名称:</span>
+                        <input type="text" id="funcNameInput" value="dianzhen" style="width: 90px; background: var(--bg-primary); color: white; border: 1px solid var(--border-color); padding: 4px 6px; border-radius: 4px; font-family: 'Fira Code', monospace; text-align: center;">
+                    </label>
+
+                    <label style="font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                        <span>显示步进序号:</span>
+                        <input type="checkbox" id="showStepNum" checked style="cursor: pointer;">
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace -->
+        <div class="workspace">
+            <div class="matrix-container-wrapper">
+                <div class="grid-with-axis">
+                    <!-- Top Left Corner (0,0 indicator) -->
+                    <div class="corner-header">(0,0)</div>
+                    
+                    <!-- X Axis Header (Columns 0 to 7) -->
+                    <div class="col-axis">
+                        <span>X:0</span><span>X:1</span><span>X:2</span><span>X:3</span>
+                        <span>X:4</span><span>X:5</span><span>X:6</span><span>X:7</span>
+                    </div>
+
+                    <!-- Y Axis Header (Rows 0 to 7) -->
+                    <div class="row-axis">
+                        <span>Y:0</span><span>Y:1</span><span>Y:2</span><span>Y:3</span>
+                        <span>Y:4</span><span>Y:5</span><span>Y:6</span><span>Y:7</span>
+                    </div>
+
+                    <!-- 8x8 Grid -->
+                    <div class="matrix-grid" id="matrixGrid"></div>
+                </div>
+
+                <div class="stats-bar">
+                    <span>当前点亮数: <strong id="activeCount">0</strong> / 64</span>
+                    <span>原点: <strong>左上角 (0, 0)</strong></span>
+                </div>
+            </div>
+
+            <!-- Dual Output Section -->
+            <div class="outputs-container">
+                <!-- Panel 1: Pure Coordinates Output -->
+                <div class="output-panel">
+                    <div class="output-header">
+                        <div class="section-title" style="margin: 0;">1. 坐标点列表 (依次回车排列)</div>
+                        <div style="display: flex; gap: 0.4rem;">
+                            <button class="btn btn-primary" id="btnCopyCoords" style="padding: 3px 10px; font-size: 0.78rem;">
+                                📋 复制坐标
+                            </button>
+                            <button class="btn btn-danger" id="btnClearOutput" style="padding: 3px 10px; font-size: 0.78rem;">
+                                🧹 清空
+                            </button>
+                        </div>
+                    </div>
+                    <div class="code-box" id="coordsOutput" placeholder="在点阵屏中点击点亮LED，坐标将按 (x,y) 格式依次回车显示在下方..."></div>
+                </div>
+
+                <!-- Panel 2: Generated C Code Template -->
+                <div class="output-panel">
+                    <div class="output-header">
+                        <div class="section-title" style="margin: 0; color: #a7f3d0;">2. 自动生成 C 语言驱动代码</div>
+                        <button class="btn btn-success" id="btnCopyCode" style="padding: 3px 10px; font-size: 0.78rem;">
+                            ⚡ 复制 C 代码
+                        </button>
+                    </div>
+                    <div class="code-box c-code" id="codeOutput"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const matrixGrid = document.getElementById('matrixGrid');
+            const coordsOutput = document.getElementById('coordsOutput');
+            const codeOutput = document.getElementById('codeOutput');
+            const activeCountEl = document.getElementById('activeCount');
+            const customColorPicker = document.getElementById('customColorPicker');
+            const hexVal = document.getElementById('hexVal');
+            const funcNameInput = document.getElementById('funcNameInput');
+            const showStepNumCb = document.getElementById('showStepNum');
+            const codeModeSelect = document.getElementById('codeModeSelect');
+            const use51CodeKeyCb = document.getElementById('use51CodeKey');
+
+            let currentColor = '#38bdf8';
+            let isMouseDown = false;
+
+            // 8x8 Grid state (8 rows, 8 columns)
+            // state[y][x] stores color string or null
+            const gridState = Array(8).fill(null).map(() => Array(8).fill(null));
+            
+            // Keeps track of the clicking order of points
+            let clickSequence = [];
+
+            // Initialize Grid DOM
+            function initGrid() {
+                matrixGrid.innerHTML = '';
+                for (let y = 0; y < 8; y++) {
+                    for (let x = 0; x < 8; x++) {
+                        const dot = document.createElement('div');
+                        dot.className = 'led-dot';
+                        dot.dataset.x = x;
+                        dot.dataset.y = y;
+                        
+                        dot.addEventListener('mousedown', () => {
+                            isMouseDown = true;
+                            toggleDot(x, y);
+                        });
+
+                        dot.addEventListener('mouseenter', () => {
+                            if (isMouseDown) {
+                                setDotState(x, y, true);
+                            }
+                        });
+
+                        matrixGrid.appendChild(dot);
+                    }
+                }
+            }
+
+            document.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+
+            function toggleDot(x, y) {
+                if (gridState[y][x]) {
+                    gridState[y][x] = null;
+                    // remove from sequence
+                    clickSequence = clickSequence.filter(pt => !(pt.x === x && pt.y === y));
+                } else {
+                    gridState[y][x] = currentColor;
+                    // add to sequence
+                    clickSequence.push({ x, y });
+                }
+                updateAllUI();
+            }
+
+            function setDotState(x, y, turnOn) {
+                if (turnOn && !gridState[y][x]) {
+                    gridState[y][x] = currentColor;
+                    clickSequence.push({ x, y });
+                } else if (!turnOn && gridState[y][x]) {
+                    gridState[y][x] = null;
+                    clickSequence = clickSequence.filter(pt => !(pt.x === x && pt.y === y));
+                }
+                updateAllUI();
+            }
+
+            function updateAllUI() {
+                const dots = matrixGrid.children;
+                let activeCount = 0;
+
+                // Update Grid LED Visuals
+                for (let y = 0; y < 8; y++) {
+                    for (let x = 0; x < 8; x++) {
+                        const idx = y * 8 + x;
+                        const dot = dots[idx];
+                        const color = gridState[y][x];
+
+                        // Find step index if enabled
+                        const seqIdx = clickSequence.findIndex(pt => pt.x === x && pt.y === y);
+
+                        if (color) {
+                            activeCount++;
+                            dot.classList.add('active');
+                            dot.style.setProperty('--color-active', color);
+                            dot.style.setProperty('--color-glow', hexToRgba(color, 0.7));
+                            dot.textContent = (showStepNumCb.checked && seqIdx !== -1) ? (seqIdx + 1) : '';
+                        } else {
+                            dot.classList.remove('active');
+                            dot.style.removeProperty('--color-active');
+                            dot.style.removeProperty('--color-glow');
+                            dot.textContent = '';
+                        }
+                    }
+                }
+
+                activeCountEl.textContent = activeCount;
+
+                // Build Coordinates Output (Newline separated)
+                const coordsList = clickSequence.map(pt => `(${pt.x}, ${pt.y})`);
+                coordsOutput.textContent = coordsList.join('\n');
+
+                // Build C Code Output based on selected mode
+                const funcName = funcNameInput.value.trim() || 'dianzhen';
+                const mode = codeModeSelect.value;
+                const useCodeKeyword = use51CodeKeyCb.checked;
+
+                if (mode === 'table') {
+                    generateTableCCode(clickSequence, funcName, useCodeKeyword);
+                } else {
+                    generateSwitchCCode(clickSequence, funcName);
+                }
+            }
+
+            // Generate Table Lookup Code (X_Tab, Y_Tab)
+            function generateTableCCode(sequence, funcName, useCodeKeyword) {
+                const N = sequence.length;
+                if (N === 0) {
+                    codeOutput.textContent = `// 点击点阵屏上的点后，自动在此处生成查表法驱动代码`;
+                    return;
+                }
+
+                const codeKey = useCodeKeyword ? 'code ' : '';
+                const xVals = sequence.map(pt => pt.x).join(', ');
+                const yVals = sequence.map(pt => pt.y).join(', ');
+
+                let code = `// 将坐标数据提取为全局常量数组（存储于 Flash/ROM 中）\n`;
+                code += `unsigned char ${codeKey}X_Tab[${N}] = {${xVals}};\n`;
+                code += `unsigned char ${codeKey}Y_Tab[${N}] = {${yVals}};\n\n`;
+                code += `// 定时器或主循环驱动逻辑：\n`;
+                code += `if (time == 0) {\n`;
+                code += `    // 1. 通过 state 作为索引查表获取坐标\n`;
+                code += `    ${funcName}(X_Tab[state], Y_Tab[state]);\n\n`;
+                code += `    // 2. 状态递增，超过 ${N} 时归零完成循环\n`;
+                code += `    state++;\n`;
+                code += `    if (state >= ${N}) {\n`;
+                code += `        state = 0;\n`;
+                code += `    }\n`;
+                code += `}`;
+
+                codeOutput.textContent = code;
+            }
+
+            // Generate Switch-case Code
+            function generateSwitchCCode(sequence, funcName) {
+                const N = sequence.length;
+                if (N === 0) {
+                    codeOutput.textContent = `// 点击点阵屏上的点后，自动在此处生成 switch-case 代码`;
+                    return;
+                }
+
+                let code = `if (time == 0) {\n`;
+                code += `    switch (state) {\n`;
+
+                sequence.forEach((pt, index) => {
+                    const nextState = (index === N - 1) ? 0 : index + 1;
+                    code += `        case ${index}:\n`;
+                    code += `            ${funcName}(${pt.x}, ${pt.y});\n`;
+                    code += `            state = ${nextState};\n`;
+                    code += `            break;\n`;
+                });
+
+                code += `    }\n`;
+                code += `}`;
+
+                codeOutput.textContent = code;
+            }
+
+            function hexToRgba(hex, alpha) {
+                let c = hex.replace('#', '');
+                if (c.length === 3) {
+                    c = c.split('').map(x => x + x).join('');
+                }
+                const num = parseInt(c, 16);
+                return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+            }
+
+            // Color Presets Event Handler
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentColor = btn.dataset.color;
+                    customColorPicker.value = currentColor;
+                    hexVal.textContent = currentColor;
+                });
+            });
+
+            customColorPicker.addEventListener('input', (e) => {
+                currentColor = e.target.value;
+                hexVal.textContent = currentColor;
+                document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            });
+
+            // Action Buttons
+            document.getElementById('btnClear').addEventListener('click', () => {
+                for (let y = 0; y < 8; y++) {
+                    for (let x = 0; x < 8; x++) {
+                        gridState[y][x] = null;
+                    }
+                }
+                clickSequence = [];
+                updateAllUI();
+            });
+
+            document.getElementById('btnFill').addEventListener('click', () => {
+                clickSequence = [];
+                for (let y = 0; y < 8; y++) {
+                    for (let x = 0; x < 8; x++) {
+                        gridState[y][x] = currentColor;
+                        clickSequence.push({ x, y });
+                    }
+                }
+                updateAllUI();
+            });
+
+            document.getElementById('btnInvert').addEventListener('click', () => {
+                const newSeq = [];
+                for (let y = 0; y < 8; y++) {
+                    for (let x = 0; x < 8; x++) {
+                        if (gridState[y][x]) {
+                            gridState[y][x] = null;
+                        } else {
+                            gridState[y][x] = currentColor;
+                            newSeq.push({ x, y });
+                        }
+                    }
+                }
+                clickSequence = newSeq;
+                updateAllUI();
+            });
+
+            document.getElementById('btnClearOutput').addEventListener('click', () => {
+                for (let y = 0; y < 8; y++) {
+                    for (let x = 0; x < 8; x++) {
+                        gridState[y][x] = null;
+                    }
+                }
+                clickSequence = [];
+                updateAllUI();
+            });
+
+            document.getElementById('btnCopyCoords').addEventListener('click', () => {
+                const text = coordsOutput.textContent;
+                if (!text) return;
+                navigator.clipboard.writeText(text).then(() => {
+                    const btn = document.getElementById('btnCopyCoords');
+                    const originalText = btn.innerText;
+                    btn.innerText = '✅ 已复制!';
+                    setTimeout(() => { btn.innerText = originalText; }, 1500);
+                });
+            });
+
+            document.getElementById('btnCopyCode').addEventListener('click', () => {
+                const text = codeOutput.textContent;
+                if (!text) return;
+                navigator.clipboard.writeText(text).then(() => {
+                    const btn = document.getElementById('btnCopyCode');
+                    const originalText = btn.innerText;
+                    btn.innerText = '✅ 代码已复制!';
+                    setTimeout(() => { btn.innerText = originalText; }, 1500);
+                });
+            });
+
+            funcNameInput.addEventListener('input', updateAllUI);
+            showStepNumCb.addEventListener('change', updateAllUI);
+            codeModeSelect.addEventListener('change', updateAllUI);
+            use51CodeKeyCb.addEventListener('change', updateAllUI);
+
+            // Initialize
+            initGrid();
+        });
+    </script>
+</body>
+</html>
